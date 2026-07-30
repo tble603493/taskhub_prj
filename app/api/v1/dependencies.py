@@ -6,8 +6,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import decode_token
 from app.db.session import get_db
+from app.models.enums import WorkspaceRole
 from app.models.user import User
+from app.models.workspace import Workspace
+from app.models.workspace_member import WorkspaceMember
+from app.repositories.workspace_member import WorkspaceMemberRepository
 from app.services.user import UserService
+from app.services.workspace import WorkspaceService
 
 DbSession = Annotated[AsyncSession, Depends(get_db)]
 
@@ -59,3 +64,64 @@ async def get_current_active_user(
         )
 
     return current_user
+
+
+async def get_workspace_member(
+    workspace_id: int,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: DbSession,
+) -> WorkspaceMember:
+    member_repository = WorkspaceMemberRepository(session)
+
+    member = await member_repository.get_by_workspace_and_user(
+        workspace_id=workspace_id,
+        user_id=current_user.id,
+    )
+
+    if member is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not a member of this workspace",
+        )
+
+    return member
+
+
+async def get_workspace_with_access(
+    workspace_id: int,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: DbSession,
+) -> Workspace:
+    workspace_service = WorkspaceService(session)
+
+    return await workspace_service.get_workspace(
+        current_user=current_user,
+        workspace_id=workspace_id,
+    )
+
+
+async def require_workspace_owner(
+    workspace_id: int,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: DbSession,
+) -> WorkspaceMember:
+    member_repository = WorkspaceMemberRepository(session)
+
+    member = await member_repository.get_by_workspace_and_user(
+        workspace_id=workspace_id,
+        user_id=current_user.id,
+    )
+
+    if member is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not a member of this workspace",
+        )
+
+    if member.role != WorkspaceRole.OWNER:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only workspace owners can perform this action",
+        )
+
+    return member
