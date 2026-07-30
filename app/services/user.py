@@ -1,8 +1,10 @@
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.security import hash_password, verify_password
 from app.models.user import User
 from app.repositories.user import UserRepository
+from app.schemas.auth import ChangePasswordRequest
 from app.schemas.user import UserCreate, UserUpdate
 
 
@@ -31,11 +33,10 @@ class UserService:
                 detail="Email already exists",
             )
 
-        # TODO: Ngay 4 thay bang password hashing that.
         user = await self.user_repository.create(
             {
                 "email": str(data.email),
-                "hashed_password": data.password,
+                "hashed_password": hash_password(data.password),
                 "full_name": data.full_name,
             }
         )
@@ -65,3 +66,25 @@ class UserService:
 
     async def list_users(self, page: int, limit: int) -> tuple[list[User], int]:
         return await self.user_repository.paginate(page=page, limit=limit)
+
+    async def change_password(
+        self,
+        user: User,
+        data: ChangePasswordRequest,
+    ) -> User:
+        if not verify_password(data.current_password, user.hashed_password):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Current password is incorrect",
+            )
+
+        updated_user = await self.user_repository.update(
+            user,
+            {
+                "hashed_password": hash_password(data.new_password),
+            },
+        )
+
+        await self.session.commit()
+        await self.session.refresh(updated_user)
+        return updated_user
