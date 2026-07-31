@@ -7,9 +7,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.security import decode_token
 from app.db.session import get_db
 from app.models.enums import WorkspaceRole
+from app.models.project import Project
 from app.models.user import User
 from app.models.workspace import Workspace
 from app.models.workspace_member import WorkspaceMember
+from app.repositories.project import ProjectRepository
 from app.repositories.workspace_member import WorkspaceMemberRepository
 from app.services.user import UserService
 from app.services.workspace import WorkspaceService
@@ -125,3 +127,38 @@ async def require_workspace_owner(
         )
 
     return member
+
+
+PROJECT_WRITE_ROLES = {WorkspaceRole.OWNER, WorkspaceRole.EDITOR}
+
+
+async def get_project_with_access(
+    workspace_id: int,
+    project_id: int,
+    current_user: Annotated[User, Depends(get_current_active_user)],
+    session: DbSession,
+) -> Project:
+    member_repo = WorkspaceMemberRepository(session)
+    project_repo = ProjectRepository(session)
+
+    member = await member_repo.get_by_workspace_and_user(
+        workspace_id=workspace_id,
+        user_id=current_user.id,
+    )
+    if member is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not a member of this workspace",
+        )
+
+    project = await project_repo.get_by_workspace(
+        project_id=project_id,
+        workspace_id=workspace_id,
+    )
+    if project is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Project not found",
+        )
+
+    return project
