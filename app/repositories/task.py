@@ -1,8 +1,30 @@
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.sql.elements import ColumnElement
 
+from app.models.enums import TaskPriority, TaskStatus
 from app.models.task import Task
 from app.repositories.base import BaseRepository
+
+
+def _task_filters(
+    project_id: int,
+    status: TaskStatus | None = None,
+    priority: TaskPriority | None = None,
+    assignee_id: int | None = None,
+) -> list[ColumnElement[bool]]:
+    filters: list[ColumnElement[bool]] = [Task.project_id == project_id]
+
+    if status is not None:
+        filters.append(Task.status == status)
+
+    if priority is not None:
+        filters.append(Task.priority == priority)
+
+    if assignee_id is not None:
+        filters.append(Task.assignee_id == assignee_id)
+
+    return filters
 
 
 class TaskRepository(BaseRepository[Task]):
@@ -14,21 +36,42 @@ class TaskRepository(BaseRepository[Task]):
         project_id: int,
         offset: int,
         limit: int,
+        status: TaskStatus | None = None,
+        priority: TaskPriority | None = None,
+        assignee_id: int | None = None,
     ) -> list[Task]:
+        filters = _task_filters(
+            project_id=project_id,
+            status=status,
+            priority=priority,
+            assignee_id=assignee_id,
+        )
+
         result = await self.session.execute(
             select(Task)
-            .where(Task.project_id == project_id)
+            .where(*filters)
             .order_by(Task.created_at.desc())
             .offset(offset)
             .limit(limit)
         )
         return list(result.scalars().all())
 
-    async def count_by_project(self, project_id: int) -> int:
+    async def count_by_project(
+        self,
+        project_id: int,
+        status: TaskStatus | None = None,
+        priority: TaskPriority | None = None,
+        assignee_id: int | None = None,
+    ) -> int:
+        filters = _task_filters(
+            project_id=project_id,
+            status=status,
+            priority=priority,
+            assignee_id=assignee_id,
+        )
+
         result = await self.session.execute(
-            select(func.count())
-            .select_from(Task)
-            .where(Task.project_id == project_id)
+            select(func.count()).select_from(Task).where(*filters)
         )
         return result.scalar_one()
 
