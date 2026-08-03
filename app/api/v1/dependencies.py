@@ -1,9 +1,15 @@
+from collections.abc import Awaitable, Callable
 from typing import Annotated
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.permissions import (
+    CONTENT_WRITE_ROLES,
+    WORKSPACE_OWNER_ROLES,
+    require_workspace_roles,
+)
 from app.core.security import decode_token
 from app.db.session import get_db
 from app.models.enums import WorkspaceRole
@@ -91,6 +97,40 @@ async def get_workspace_member(
     return member
 
 
+def require_workspace_roles_dependency(
+    allowed_roles: set[WorkspaceRole],
+) -> Callable[..., Awaitable[WorkspaceMember]]:
+    async def dependency(
+        member: Annotated[WorkspaceMember, Depends(get_workspace_member)],
+    ) -> WorkspaceMember:
+        require_workspace_roles(member, allowed_roles)
+        return member
+
+    return dependency
+
+
+RequireWorkspaceOwnerMember = Annotated[
+    WorkspaceMember,
+    Depends(require_workspace_roles_dependency(WORKSPACE_OWNER_ROLES)),
+]
+RequireContentWriterMember = Annotated[
+    WorkspaceMember,
+    Depends(require_workspace_roles_dependency(CONTENT_WRITE_ROLES)),
+]
+
+
+async def require_workspace_owner_member(
+    member: RequireWorkspaceOwnerMember,
+) -> WorkspaceMember:
+    return member
+
+
+async def require_content_writer_member(
+    member: RequireContentWriterMember,
+) -> WorkspaceMember:
+    return member
+
+
 async def get_workspace_with_access(
     workspace_id: int,
     current_user: Annotated[User, Depends(get_current_active_user)],
@@ -122,11 +162,11 @@ async def require_workspace_owner(
             detail="You are not a member of this workspace",
         )
 
-    if member.role != WorkspaceRole.OWNER:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only workspace owners can perform this action",
-        )
+    require_workspace_roles(
+        member=member,
+        allowed_roles=WORKSPACE_OWNER_ROLES,
+        detail="Only workspace owners can perform this action",
+    )
 
     return member
 

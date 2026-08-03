@@ -1,7 +1,8 @@
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.enums import ProjectStatus, WorkspaceRole
+from app.core.permissions import require_content_write, require_workspace_owner
+from app.models.enums import ProjectStatus
 from app.models.project import Project
 from app.models.user import User
 from app.models.workspace_member import WorkspaceMember
@@ -9,16 +10,6 @@ from app.repositories.project import ProjectRepository
 from app.repositories.workspace_member import WorkspaceMemberRepository
 from app.schemas.pagination import PaginatedResponse
 from app.schemas.project import ProjectCreate, ProjectResponse, ProjectUpdate
-
-WRITE_ROLES = {WorkspaceRole.OWNER, WorkspaceRole.EDITOR}
-
-
-def _require_project_write(member: WorkspaceMember) -> None:
-    if member.role not in WRITE_ROLES:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not enough permissions for this project",
-        )
 
 
 def _ensure_project_active(project: Project) -> None:
@@ -74,7 +65,7 @@ class ProjectService:
         data: ProjectCreate,
     ) -> Project:
         member = await self._get_membership(current_user, workspace_id)
-        _require_project_write(member)
+        require_content_write(member)
 
         existing_project = await self.project_repo.get_by_workspace_and_name(
             workspace_id=workspace_id,
@@ -144,7 +135,7 @@ class ProjectService:
         data: ProjectUpdate,
     ) -> Project:
         member = await self._get_membership(current_user, workspace_id)
-        _require_project_write(member)
+        require_content_write(member)
 
         project = await self._get_project_in_workspace(workspace_id, project_id)
         _ensure_project_active(project)
@@ -175,7 +166,7 @@ class ProjectService:
         project_id: int,
     ) -> Project:
         member = await self._get_membership(current_user, workspace_id)
-        _require_project_write(member)
+        require_content_write(member)
 
         project = await self._get_project_in_workspace(workspace_id, project_id)
 
@@ -194,12 +185,7 @@ class ProjectService:
         project_id: int,
     ) -> None:
         member = await self._get_membership(current_user, workspace_id)
-
-        if member.role != WorkspaceRole.OWNER:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Only workspace owner can delete project",
-            )
+        require_workspace_owner(member)
 
         project = await self._get_project_in_workspace(workspace_id, project_id)
         await self.project_repo.delete(project)
