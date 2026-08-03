@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.dependencies import get_current_active_user
 from app.db.session import get_db
+from app.models.enums import TaskPriority, TaskStatus
 from app.models.task import Task
 from app.models.user import User
 from app.schemas.pagination import PaginatedResponse
@@ -46,6 +47,9 @@ async def list_tasks(
     session: Annotated[AsyncSession, Depends(get_db)],
     page: Annotated[int, Query(ge=1)] = 1,
     limit: Annotated[int, Query(ge=1, le=100)] = 20,
+    status: TaskStatus | None = None,
+    priority: TaskPriority | None = None,
+    assignee_id: int | None = None,
 ) -> PaginatedResponse[TaskResponse]:
     service = TaskService(session)
     return await service.list_tasks(
@@ -54,6 +58,9 @@ async def list_tasks(
         project_id=project_id,
         page=page,
         limit=limit,
+        status=status,
+        priority=priority,
+        assignee_id=assignee_id,
     )
 
 

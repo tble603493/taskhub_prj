@@ -1,7 +1,7 @@
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.enums import ProjectStatus, WorkspaceRole
+from app.models.enums import ProjectStatus, TaskPriority, TaskStatus, WorkspaceRole
 from app.models.project import Project
 from app.models.task import Task
 from app.models.user import User
@@ -149,8 +149,12 @@ class TaskService:
         project_id: int,
         page: int,
         limit: int,
+        status: TaskStatus | None = None,
+        priority: TaskPriority | None = None,
+        assignee_id: int | None = None,
     ) -> PaginatedResponse[TaskResponse]:
         await self._get_membership(current_user, workspace_id)
+
         await self._get_project_in_workspace(
             workspace_id=workspace_id,
             project_id=project_id,
@@ -162,15 +166,22 @@ class TaskService:
             project_id=project_id,
             offset=offset,
             limit=limit,
+            status=status,
+            priority=priority,
+            assignee_id=assignee_id,
         )
-        total = await self.task_repo.count_by_project(project_id)
+
+        total = await self.task_repo.count_by_project(
+            project_id=project_id,
+            status=status,
+            priority=priority,
+            assignee_id=assignee_id,
+        )
+
         pages = (total + limit - 1) // limit if total > 0 else 0
 
         return PaginatedResponse[TaskResponse](
-            items=[
-                TaskResponse.model_validate(task)
-                for task in tasks
-            ],
+            items=[TaskResponse.model_validate(task) for task in tasks],
             total=total,
             page=page,
             limit=limit,
@@ -185,6 +196,7 @@ class TaskService:
         task_id: int,
     ) -> Task:
         await self._get_membership(current_user, workspace_id)
+
         await self._get_project_in_workspace(
             workspace_id=workspace_id,
             project_id=project_id,
