@@ -1,7 +1,8 @@
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.enums import ProjectStatus, WorkspaceRole
+from app.core.permissions import require_content_write
+from app.models.enums import ProjectStatus
 from app.models.label import Label
 from app.models.project import Project
 from app.models.task import Task
@@ -12,16 +13,6 @@ from app.repositories.project import ProjectRepository
 from app.repositories.task import TaskRepository
 from app.repositories.workspace_member import WorkspaceMemberRepository
 from app.schemas.label import LabelCreate, LabelUpdate
-
-LABEL_WRITE_ROLES = {WorkspaceRole.OWNER, WorkspaceRole.EDITOR}
-
-
-def _require_label_write(member: WorkspaceMember) -> None:
-    if member.role not in LABEL_WRITE_ROLES:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not enough permissions for this label",
-        )
 
 
 def _ensure_project_active(project: Project) -> None:
@@ -112,7 +103,7 @@ class LabelService:
         data: LabelCreate,
     ) -> Label:
         member = await self._get_membership(current_user, workspace_id)
-        _require_label_write(member)
+        require_content_write(member)
 
         project = await self._get_project_in_workspace(
             workspace_id=workspace_id,
@@ -184,7 +175,7 @@ class LabelService:
         data: LabelUpdate,
     ) -> Label:
         member = await self._get_membership(current_user, workspace_id)
-        _require_label_write(member)
+        require_content_write(member)
 
         project = await self._get_project_in_workspace(
             workspace_id=workspace_id,
@@ -226,7 +217,7 @@ class LabelService:
         label_id: int,
     ) -> None:
         member = await self._get_membership(current_user, workspace_id)
-        _require_label_write(member)
+        require_content_write(member)
 
         project = await self._get_project_in_workspace(
             workspace_id=workspace_id,
@@ -251,7 +242,7 @@ class LabelService:
         label_id: int,
     ) -> Label:
         member = await self._get_membership(current_user, workspace_id)
-        _require_label_write(member)
+        require_content_write(member)
 
         project = await self._get_project_in_workspace(
             workspace_id=workspace_id,
@@ -287,7 +278,7 @@ class LabelService:
         label_id: int,
     ) -> None:
         member = await self._get_membership(current_user, workspace_id)
-        _require_label_write(member)
+        require_content_write(member)
 
         project = await self._get_project_in_workspace(
             workspace_id=workspace_id,

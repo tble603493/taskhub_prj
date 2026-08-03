@@ -1,8 +1,9 @@
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.permissions import can_delete_comment
 from app.models.comment import Comment
-from app.models.enums import ProjectStatus, WorkspaceRole
+from app.models.enums import ProjectStatus
 from app.models.project import Project
 from app.models.task import Task
 from app.models.user import User
@@ -13,8 +14,6 @@ from app.repositories.task import TaskRepository
 from app.repositories.workspace_member import WorkspaceMemberRepository
 from app.schemas.comment import CommentCreate
 
-COMMENT_MODERATE_ROLES = {WorkspaceRole.OWNER, WorkspaceRole.EDITOR}
-
 
 def _ensure_project_active(project: Project) -> None:
     if project.status == ProjectStatus.ARCHIVED:
@@ -22,14 +21,6 @@ def _ensure_project_active(project: Project) -> None:
             status_code=status.HTTP_409_CONFLICT,
             detail="Project is archived",
         )
-
-
-def _can_delete_comment(
-    current_user: User,
-    member: WorkspaceMember,
-    comment: Comment,
-) -> bool:
-    return comment.author_id == current_user.id or member.role in COMMENT_MODERATE_ROLES
 
 
 class CommentService:
@@ -184,7 +175,7 @@ class CommentService:
             comment_id=comment_id,
         )
 
-        if not _can_delete_comment(
+        if not can_delete_comment(
             current_user=current_user,
             member=member,
             comment=comment,

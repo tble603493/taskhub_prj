@@ -1,6 +1,7 @@
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.permissions import require_workspace_owner
 from app.models.enums import WorkspaceRole
 from app.models.user import User
 from app.models.workspace import Workspace
@@ -226,11 +227,7 @@ class WorkspaceService:
                 detail="Workspace not found",
             )
 
-        if member.role != WorkspaceRole.OWNER:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Only workspace owners can perform this action",
-            )
+        require_workspace_owner(member)
 
         return member
 

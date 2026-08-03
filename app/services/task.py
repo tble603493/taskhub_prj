@@ -1,7 +1,8 @@
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.enums import ProjectStatus, TaskPriority, TaskStatus, WorkspaceRole
+from app.core.permissions import require_content_write
+from app.models.enums import ProjectStatus, TaskPriority, TaskStatus
 from app.models.project import Project
 from app.models.task import Task
 from app.models.user import User
@@ -11,16 +12,6 @@ from app.repositories.task import TaskRepository
 from app.repositories.workspace_member import WorkspaceMemberRepository
 from app.schemas.pagination import PaginatedResponse
 from app.schemas.task import TaskCreate, TaskResponse, TaskUpdate
-
-TASK_WRITE_ROLES = {WorkspaceRole.OWNER, WorkspaceRole.EDITOR}
-
-
-def _require_task_write(member: WorkspaceMember) -> None:
-    if member.role not in TASK_WRITE_ROLES:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Not enough permissions for this task",
-        )
 
 
 def _ensure_project_active(project: Project) -> None:
@@ -112,7 +103,7 @@ class TaskService:
         data: TaskCreate,
     ) -> Task:
         member = await self._get_membership(current_user, workspace_id)
-        _require_task_write(member)
+        require_content_write(member)
 
         project = await self._get_project_in_workspace(
             workspace_id=workspace_id,
@@ -216,7 +207,7 @@ class TaskService:
         data: TaskUpdate,
     ) -> Task:
         member = await self._get_membership(current_user, workspace_id)
-        _require_task_write(member)
+        require_content_write(member)
 
         project = await self._get_project_in_workspace(
             workspace_id=workspace_id,
@@ -252,7 +243,7 @@ class TaskService:
         task_id: int,
     ) -> None:
         member = await self._get_membership(current_user, workspace_id)
-        _require_task_write(member)
+        require_content_write(member)
 
         project = await self._get_project_in_workspace(
             workspace_id=workspace_id,
