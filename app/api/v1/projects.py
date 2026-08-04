@@ -3,6 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.responses import COMMON_ERROR_RESPONSES
 from app.api.v1.dependencies import get_current_active_user
 from app.db.session import get_db
 from app.models.project import Project
@@ -11,13 +12,17 @@ from app.schemas.pagination import PaginatedResponse
 from app.schemas.project import ProjectCreate, ProjectResponse, ProjectUpdate
 from app.services.project import ProjectService
 
-router = APIRouter(tags=["projects"])
+router = APIRouter(tags=["Projects"], responses=COMMON_ERROR_RESPONSES)
 
 
 @router.post(
     "/workspaces/{workspace_id}/projects",
     response_model=ProjectResponse,
     status_code=status.HTTP_201_CREATED,
+    summary="Create project",
+    description=(
+        "Create a project inside a workspace. Owner or editor role is required."
+    ),
 )
 async def create_project(
     workspace_id: int,
@@ -36,6 +41,8 @@ async def create_project(
 @router.get(
     "/workspaces/{workspace_id}/projects",
     response_model=PaginatedResponse[ProjectResponse],
+    summary="List projects",
+    description="List projects inside a workspace visible to the current member.",
 )
 async def list_projects(
     workspace_id: int,
@@ -56,6 +63,8 @@ async def list_projects(
 @router.get(
     "/workspaces/{workspace_id}/projects/{project_id}",
     response_model=ProjectResponse,
+    summary="Get project",
+    description="Get a project scoped to its workspace.",
 )
 async def get_project(
     workspace_id: int,
@@ -94,6 +103,8 @@ async def update_project(
 @router.patch(
     "/workspaces/{workspace_id}/projects/{project_id}/archive",
     response_model=ProjectResponse,
+    summary="Archive project",
+    description="Mark a project as archived instead of hard deleting it.",
 )
 async def archive_project(
     workspace_id: int,

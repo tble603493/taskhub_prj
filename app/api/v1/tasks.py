@@ -3,6 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, BackgroundTasks, Depends, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.responses import COMMON_ERROR_RESPONSES
 from app.api.v1.dependencies import get_current_active_user
 from app.db.session import get_db
 from app.models.enums import TaskPriority, TaskStatus
@@ -13,13 +14,15 @@ from app.schemas.task import TaskCreate, TaskResponse, TaskUpdate
 from app.services.notification import notify_task_assigned_safely
 from app.services.task import TaskService
 
-router = APIRouter(tags=["tasks"])
+router = APIRouter(tags=["Tasks"], responses=COMMON_ERROR_RESPONSES)
 
 
 @router.post(
     "/workspaces/{workspace_id}/projects/{project_id}/tasks",
     response_model=TaskResponse,
     status_code=status.HTTP_201_CREATED,
+    summary="Create task",
+    description="Create a task in an active project. Owner or editor role is required.",
 )
 async def create_task(
     workspace_id: int,
@@ -40,6 +43,10 @@ async def create_task(
 @router.get(
     "/workspaces/{workspace_id}/projects/{project_id}/tasks",
     response_model=PaginatedResponse[TaskResponse],
+    summary="List tasks",
+    description=(
+        "List tasks by project with optional status, priority and assignee filters."
+    ),
 )
 async def list_tasks(
     workspace_id: int,
@@ -68,6 +75,8 @@ async def list_tasks(
 @router.get(
     "/workspaces/{workspace_id}/projects/{project_id}/tasks/{task_id}",
     response_model=TaskResponse,
+    summary="Get task",
+    description="Get a task scoped to its project and workspace.",
 )
 async def get_task(
     workspace_id: int,
@@ -88,6 +97,8 @@ async def get_task(
 @router.patch(
     "/workspaces/{workspace_id}/projects/{project_id}/tasks/{task_id}",
     response_model=TaskResponse,
+    summary="Update task",
+    description="Update a task. Assigning a user triggers a background notification.",
 )
 async def update_task(
     workspace_id: int,
