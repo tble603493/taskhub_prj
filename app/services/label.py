@@ -13,6 +13,8 @@ from app.repositories.project import ProjectRepository
 from app.repositories.task import TaskRepository
 from app.repositories.workspace_member import WorkspaceMemberRepository
 from app.schemas.label import LabelCreate, LabelUpdate
+from app.services.cache import CacheService
+from app.services.task_cache import invalidate_task_list_cache
 
 
 def _ensure_project_active(project: Project) -> None:
@@ -30,6 +32,18 @@ class LabelService:
         self.project_repo = ProjectRepository(session)
         self.task_repo = TaskRepository(session)
         self.member_repo = WorkspaceMemberRepository(session)
+        self.cache_service = CacheService()
+
+    async def _invalidate_task_list_cache(
+        self,
+        workspace_id: int,
+        project_id: int,
+    ) -> None:
+        await invalidate_task_list_cache(
+            cache_service=self.cache_service,
+            workspace_id=workspace_id,
+            project_id=project_id,
+        )
 
     async def _get_membership(
         self,
@@ -266,6 +280,10 @@ class LabelService:
         )
 
         await self.session.commit()
+        await self._invalidate_task_list_cache(
+            workspace_id=workspace_id,
+            project_id=project_id,
+        )
 
         return label
 
@@ -302,3 +320,7 @@ class LabelService:
         )
 
         await self.session.commit()
+        await self._invalidate_task_list_cache(
+            workspace_id=workspace_id,
+            project_id=project_id,
+        )

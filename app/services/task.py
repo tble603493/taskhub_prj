@@ -1,6 +1,7 @@
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.permissions import require_content_write
 from app.models.enums import ProjectStatus, TaskPriority, TaskStatus
 from app.models.project import Project
@@ -12,6 +13,11 @@ from app.repositories.task import TaskRepository
 from app.repositories.workspace_member import WorkspaceMemberRepository
 from app.schemas.pagination import PaginatedResponse
 from app.schemas.task import TaskCreate, TaskResponse, TaskUpdate
+from app.services.cache import CacheService
+from app.services.task_cache import (
+    build_task_list_cache_key,
+    invalidate_task_list_cache,
+)
 
 
 def _ensure_project_active(project: Project) -> None:
@@ -28,6 +34,18 @@ class TaskService:
         self.task_repo = TaskRepository(session)
         self.project_repo = ProjectRepository(session)
         self.member_repo = WorkspaceMemberRepository(session)
+        self.cache_service = CacheService()
+
+    async def _invalidate_task_list_cache(
+        self,
+        workspace_id: int,
+        project_id: int,
+    ) -> None:
+        await invalidate_task_list_cache(
+            cache_service=self.cache_service,
+            workspace_id=workspace_id,
+            project_id=project_id,
+        )
 
     async def _get_membership(
         self,
@@ -130,6 +148,10 @@ class TaskService:
 
         await self.session.commit()
         await self.session.refresh(task)
+        await self._invalidate_task_list_cache(
+            workspace_id=workspace_id,
+            project_id=project_id,
+        )
 
         return task
 
@@ -151,6 +173,21 @@ class TaskService:
             project_id=project_id,
         )
 
+        cache_key = build_task_list_cache_key(
+            workspace_id=workspace_id,
+            project_id=project_id,
+            page=page,
+            limit=limit,
+            status=status,
+            priority=priority,
+            assignee_id=assignee_id,
+        )
+
+        cached_data = await self.cache_service.get_json(cache_key)
+
+        if cached_data is not None:
+            return PaginatedResponse[TaskResponse].model_validate(cached_data)
+
         offset = (page - 1) * limit
 
         tasks = await self.task_repo.list_by_project(
@@ -171,13 +208,21 @@ class TaskService:
 
         pages = (total + limit - 1) // limit if total > 0 else 0
 
-        return PaginatedResponse[TaskResponse](
+        response = PaginatedResponse[TaskResponse](
             items=[TaskResponse.model_validate(task) for task in tasks],
             total=total,
             page=page,
             limit=limit,
             pages=pages,
         )
+
+        await self.cache_service.set_json(
+            key=cache_key,
+            value=response.model_dump(mode="json"),
+            ttl_seconds=settings.task_list_cache_ttl_seconds,
+        )
+
+        return response
 
     async def get_task(
         self,
@@ -232,6 +277,10 @@ class TaskService:
 
         await self.session.commit()
         await self.session.refresh(updated_task)
+        await self._invalidate_task_list_cache(
+            workspace_id=workspace_id,
+            project_id=project_id,
+        )
 
         return updated_task
 
@@ -258,3 +307,7 @@ class TaskService:
 
         await self.task_repo.delete(task)
         await self.session.commit()
+        await self._invalidate_task_list_cache(
+            workspace_id=workspace_id,
+            project_id=project_id,
+        )
