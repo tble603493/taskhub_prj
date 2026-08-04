@@ -3,6 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.responses import COMMON_ERROR_RESPONSES
 from app.api.v1.dependencies import get_current_active_user
 from app.db.session import get_db
 from app.models.user import User
@@ -20,7 +21,7 @@ from app.schemas.workspace import (
 )
 from app.services.workspace import WorkspaceService
 
-router = APIRouter(tags=["Workspaces"])
+router = APIRouter(tags=["Workspaces"], responses=COMMON_ERROR_RESPONSES)
 
 DbSession = Annotated[AsyncSession, Depends(get_db)]
 CurrentUser = Annotated[User, Depends(get_current_active_user)]
@@ -30,6 +31,8 @@ CurrentUser = Annotated[User, Depends(get_current_active_user)]
     "",
     response_model=WorkspaceResponse,
     status_code=status.HTTP_201_CREATED,
+    summary="Create workspace",
+    description="Create a workspace and automatically add the creator as owner.",
 )
 async def create_workspace(
     data: WorkspaceCreate,
@@ -44,6 +47,8 @@ async def create_workspace(
 @router.get(
     "",
     response_model=PaginatedResponse[WorkspaceResponse],
+    summary="List workspaces",
+    description="List workspaces where the authenticated user is a member.",
 )
 async def list_workspaces(
     current_user: CurrentUser,
@@ -73,6 +78,8 @@ async def list_workspaces(
 @router.get(
     "/{workspace_id}",
     response_model=WorkspaceResponse,
+    summary="Get workspace",
+    description="Get a workspace if the authenticated user is a member.",
 )
 async def get_workspace(
     workspace_id: int,

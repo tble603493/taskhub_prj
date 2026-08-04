@@ -3,6 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.responses import COMMON_ERROR_RESPONSES
 from app.api.v1.dependencies import get_current_active_user
 from app.db.session import get_db
 from app.models.user import User
@@ -11,7 +12,7 @@ from app.schemas.pagination import PaginatedResponse
 from app.schemas.user import UserCreate, UserResponse, UserUpdate
 from app.services.user import UserService
 
-router = APIRouter(tags=["Users"])
+router = APIRouter(tags=["Users"], responses=COMMON_ERROR_RESPONSES)
 
 
 DbSession = Annotated[AsyncSession, Depends(get_db)]
@@ -21,6 +22,8 @@ CurrentUser = Annotated[User, Depends(get_current_active_user)]
 @router.get(
     "/me",
     response_model=UserResponse,
+    summary="Get current user",
+    description="Return the authenticated user's profile.",
 )
 async def get_me(current_user: CurrentUser) -> User:
     return current_user
@@ -29,6 +32,8 @@ async def get_me(current_user: CurrentUser) -> User:
 @router.patch(
     "/me",
     response_model=UserResponse,
+    summary="Update current user",
+    description="Update the authenticated user's profile.",
 )
 async def update_me(
     data: UserUpdate,
@@ -43,6 +48,8 @@ async def update_me(
 @router.patch(
     "/me/password",
     status_code=status.HTTP_204_NO_CONTENT,
+    summary="Change current user password",
+    description="Change the authenticated user's password.",
 )
 async def change_my_password(
     data: ChangePasswordRequest,

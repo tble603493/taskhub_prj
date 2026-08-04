@@ -3,6 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.responses import COMMON_ERROR_RESPONSES
 from app.api.v1.dependencies import get_current_active_user
 from app.db.session import get_db
 from app.models.comment import Comment
@@ -10,13 +11,15 @@ from app.models.user import User
 from app.schemas.comment import CommentCreate, CommentResponse
 from app.services.comment import CommentService
 
-router = APIRouter(tags=["comments"])
+router = APIRouter(tags=["Comments"], responses=COMMON_ERROR_RESPONSES)
 
 
 @router.post(
     "/workspaces/{workspace_id}/projects/{project_id}/tasks/{task_id}/comments",
     response_model=CommentResponse,
     status_code=status.HTTP_201_CREATED,
+    summary="Create comment",
+    description="Create a comment on a task in an active project.",
 )
 async def create_comment(
     workspace_id: int,
@@ -39,6 +42,8 @@ async def create_comment(
 @router.get(
     "/workspaces/{workspace_id}/projects/{project_id}/tasks/{task_id}/comments",
     response_model=list[CommentResponse],
+    summary="List comments",
+    description="List comments for a task.",
 )
 async def list_comments(
     workspace_id: int,

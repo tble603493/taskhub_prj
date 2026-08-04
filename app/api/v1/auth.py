@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, status
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.responses import COMMON_ERROR_RESPONSES
 from app.db.session import get_db
 from app.models.user import User
 from app.schemas.auth import (
@@ -16,7 +17,7 @@ from app.schemas.auth import (
 from app.schemas.user import UserResponse
 from app.services.auth import AuthService
 
-router = APIRouter(tags=["Auth"])
+router = APIRouter(tags=["Auth"], responses=COMMON_ERROR_RESPONSES)
 
 DbSession = Annotated[AsyncSession, Depends(get_db)]
 
@@ -25,6 +26,8 @@ DbSession = Annotated[AsyncSession, Depends(get_db)]
     "/register",
     response_model=UserResponse,
     status_code=status.HTTP_201_CREATED,
+    summary="Register user",
+    description="Create a new user account.",
 )
 async def register(
     data: RegisterRequest,
@@ -38,6 +41,8 @@ async def register(
 @router.post(
     "/login",
     response_model=TokenResponse,
+    summary="Login",
+    description="Login with email and password, then return access and refresh tokens.",
 )
 async def login(
     form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
@@ -56,6 +61,8 @@ async def login(
 @router.post(
     "/refresh",
     response_model=TokenResponse,
+    summary="Refresh token",
+    description="Exchange a valid refresh token for a new token pair.",
 )
 async def refresh(
     data: RefreshTokenRequest,
@@ -69,6 +76,8 @@ async def refresh(
 @router.post(
     "/logout",
     status_code=status.HTTP_204_NO_CONTENT,
+    summary="Logout",
+    description="Revoke the refresh token in Redis.",
 )
 async def logout(
     data: LogoutRequest,

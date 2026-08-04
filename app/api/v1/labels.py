@@ -3,6 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.responses import COMMON_ERROR_RESPONSES
 from app.api.v1.dependencies import get_current_active_user
 from app.db.session import get_db
 from app.models.label import Label
@@ -10,13 +11,15 @@ from app.models.user import User
 from app.schemas.label import LabelCreate, LabelResponse, LabelUpdate, TaskLabelRequest
 from app.services.label import LabelService
 
-router = APIRouter(tags=["labels"])
+router = APIRouter(tags=["Labels"], responses=COMMON_ERROR_RESPONSES)
 
 
 @router.post(
     "/workspaces/{workspace_id}/projects/{project_id}/labels",
     response_model=LabelResponse,
     status_code=status.HTTP_201_CREATED,
+    summary="Create label",
+    description="Create a label in a project. Owner or editor role is required.",
 )
 async def create_label(
     workspace_id: int,
@@ -37,6 +40,8 @@ async def create_label(
 @router.get(
     "/workspaces/{workspace_id}/projects/{project_id}/labels",
     response_model=list[LabelResponse],
+    summary="List labels",
+    description="List labels in a project.",
 )
 async def list_labels(
     workspace_id: int,
@@ -119,6 +124,8 @@ async def delete_label(
     "/workspaces/{workspace_id}/projects/{project_id}/tasks/{task_id}/labels",
     response_model=LabelResponse,
     status_code=status.HTTP_201_CREATED,
+    summary="Attach label to task",
+    description="Attach a project label to a task in the same project.",
 )
 async def attach_label_to_task(
     workspace_id: int,
