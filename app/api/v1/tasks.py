@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, Response, status
+from fastapi import APIRouter, BackgroundTasks, Depends, Query, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1.dependencies import get_current_active_user
@@ -10,6 +10,7 @@ from app.models.task import Task
 from app.models.user import User
 from app.schemas.pagination import PaginatedResponse
 from app.schemas.task import TaskCreate, TaskResponse, TaskUpdate
+from app.services.notification import notify_task_assigned_safely
 from app.services.task import TaskService
 
 router = APIRouter(tags=["tasks"])
@@ -93,17 +94,27 @@ async def update_task(
     project_id: int,
     task_id: int,
     data: TaskUpdate,
+    background_tasks: BackgroundTasks,
     current_user: Annotated[User, Depends(get_current_active_user)],
     session: Annotated[AsyncSession, Depends(get_db)],
 ) -> Task:
     service = TaskService(session)
-    return await service.update_task(
+    task = await service.update_task(
         current_user=current_user,
         workspace_id=workspace_id,
         project_id=project_id,
         task_id=task_id,
         data=data,
     )
+
+    if data.assignee_id is not None:
+        background_tasks.add_task(
+            notify_task_assigned_safely,
+            task_id=task.id,
+            assignee_id=data.assignee_id,
+        )
+
+    return task
 
 
 @router.delete(

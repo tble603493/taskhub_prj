@@ -26,6 +26,12 @@ class Settings(BaseSettings):
 
     refresh_token_expire_days: int = Field(default=7, gt=0)
 
+    task_list_cache_ttl_seconds: int = Field(default=60, gt=0)
+
+    notification_enabled: bool = True
+
+    notification_from_email: str | None = None
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
