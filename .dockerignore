@@ -1,0 +1,16 @@
+.env
+.git
+.gitignore
+.mypy_cache
+.pytest_cache
+.ruff_cache
+.venv
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+*.egg-info
+htmlcov
+coverage.xml
+PROJECT_SUMMARY.md
+DAY_*_PLAN.md
